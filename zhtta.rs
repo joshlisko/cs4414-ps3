@@ -22,10 +22,17 @@ use std::{os, str, io};
 use extra::arc;
 use std::comm::*;
 
+use std::rt::io::*;
+use std::rt::io::net::ip::SocketAddr;
+use std::io::println;
+use std::from_str::FromStr;
+
 
 static PORT:    int = 4414;
-static IPV4_LOOPBACK: &'static str = "127.0.0.1";
+//static IPV4_LOOPBACK: &'static str = "127.0.0.1";
+static IPV4_LOOPBACK: &'static str = "0.0.0.0";
 
+static IP: &'static str = "0.0.0.0";
 
 
 struct sched_msg {
@@ -46,6 +53,34 @@ fn main() {
     let (port, chan) = stream();
     let chan = SharedChan::new(chan);
     
+
+    let ip = match FromStr::from_str(IP) { Some(ip) => ip, 
+                                           None => { println(fmt!("Error: Invalid IP address <%s>", IP));
+                                                     return;},
+                                         };
+   
+    let socket = net::tcp::TcpListener::bind(SocketAddr {ip: ip, port: PORT as u16});
+
+    let mut user_IP;
+    let mut acceptor1 = socket.listen();
+    match acceptor1.accept() {
+            Some(s) => { let mut stream = s;
+                         match stream.peer_name() {
+                            Some(pn) => {user_IP = pn.to_str(); println(fmt!("Peer address: %s", user_IP));},
+                            None => {user_IP = ~"";}
+                         }
+                       },
+            None => {user_IP = ~"";}
+        }
+
+    let firstIndex = user_IP.find_str(".");
+    let firstElement = user_IP.slice(0, firstIndex.unwrap());
+    println(fmt!("%?", firstElement));
+    let tempIP = user_IP.slice(firstIndex.unwrap()+1, user_IP.len()-1);
+    println(fmt!("%?", tempIP));
+    let secondIndex = tempIP.find_str(".");
+    let secondElement = tempIP.slice(0, secondIndex.unwrap());
+    println(fmt!("%?", secondElement));
     // add file requests into queue.
     do spawn {
         while(true) {
@@ -78,9 +113,9 @@ fn main() {
     let socket = net::tcp::TcpListener::bind(SocketAddr {ip: Ipv4Addr(127,0,0,1), port: PORT as u16});
     
     println(fmt!("Listening on tcp port %d ...", PORT));
-    let mut acceptor = socket.listen().unwrap();
+   // let mut acceptor = socket.listen().unwrap();
 
-
+    let mut acceptor = acceptor1.unwrap();
     // we can limit the incoming connection count.
     //for stream in acceptor.incoming().take(10 as uint) {
     for stream in acceptor.incoming() {
