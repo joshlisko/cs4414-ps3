@@ -22,9 +22,11 @@ use std::{os, str, io};
 use extra::arc;
 use std::comm::*;
 
+
 static PORT:    int = 4414;
 static IPV4_LOOPBACK: &'static str = "127.0.0.1";
-static mut visitor_count: uint = 0;
+
+
 
 struct sched_msg {
     stream: Option<std::rt::io::net::tcp::TcpStream>,
@@ -32,6 +34,10 @@ struct sched_msg {
 }
 
 fn main() {
+    let mut visitor_count: uint = 0;
+    let safe_visitor_count = arc::RWArc::new(visitor_count);
+    
+
     let req_vec: ~[sched_msg] = ~[];
     let shared_req_vec = arc::RWArc::new(req_vec);
     let add_vec = shared_req_vec.clone();
@@ -73,18 +79,25 @@ fn main() {
     
     println(fmt!("Listening on tcp port %d ...", PORT));
     let mut acceptor = socket.listen().unwrap();
-    
+
+
     // we can limit the incoming connection count.
     //for stream in acceptor.incoming().take(10 as uint) {
     for stream in acceptor.incoming() {
+        let safe_visitor_count_local = safe_visitor_count.clone(); //create a local copy
+
         let stream = Cell::new(stream);
         
         // Start a new task to handle the connection
         let child_chan = chan.clone();
         do spawn {
-            unsafe {
-                visitor_count += 1;
-            }
+            
+        //update visitor count safely
+        do safe_visitor_count_local.write |visitor_count| {
+            *visitor_count +=1;
+        }
+         
+
             
             let mut stream = stream.take();
             let mut buf = [0, ..500];
@@ -99,6 +112,13 @@ fn main() {
                 let file_path = ~os::getcwd().push(path.replace("/../", ""));
                 if !os::path_exists(file_path) || os::path_is_dir(file_path) {
                     println(fmt!("Request received:\n%s", request_str));
+
+                    //store the current count to a copy value
+                    let mut visitor_count_copy: uint = 0;
+                    do safe_visitor_count_local.read |visitor_count|{
+                        visitor_count_copy = *visitor_count;
+                    }
+
                     let response: ~str = fmt!(
                         "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n
                          <doctype !html><html><head><title>Hello, Rust!</title>
@@ -109,7 +129,7 @@ fn main() {
                          <body>
                          <h1>Greetings, Krusty!</h1>
                          <h2>Visitor count: %u</h2>
-                         </body></html>\r\n", unsafe{visitor_count});
+                         </body></html>\r\n", visitor_count_copy);
 
                     stream.write(response.as_bytes());
                 }
