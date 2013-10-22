@@ -32,6 +32,7 @@ static PORT:    int = 4414;
 static IP: &'static str = "0.0.0.0";
 
 
+
 struct sched_msg {
     stream: Option<std::rt::io::net::tcp::TcpStream>,
     filepath: ~std::path::PosixPath
@@ -42,10 +43,15 @@ fn main() {
     let safe_visitor_count = arc::RWArc::new(visitor_count);
     
 
-    let req_vec: ~[sched_msg] = ~[];
-    let shared_req_vec = arc::RWArc::new(req_vec);
-    let add_vec = shared_req_vec.clone();
-    let take_vec = shared_req_vec.clone();
+    let req_vec_other: ~[sched_msg] = ~[];
+    let shared_req_vec_other = arc::RWArc::new(req_vec_other);
+    let add_vec_other = shared_req_vec_other.clone();
+    let take_vec_other = shared_req_vec_other.clone();
+
+    let req_vec_cville: ~[sched_msg] = ~[];
+    let shared_req_vec_cville = arc::RWArc::new(req_vec_cville);
+    let add_vec_cville = shared_req_vec_cville.clone();
+    let take_vec_cville = shared_req_vec_cville.clone();
     
     let (port, chan) = stream();
     let chan = SharedChan::new(chan);
@@ -78,18 +84,39 @@ fn main() {
     let secondIndex = tempIP.find_str(".");
     let secondElement = tempIP.slice(0, secondIndex.unwrap());
     println(fmt!("Ip Index 2 : %?", secondElement));
+
+     let inCville = ((firstElement == "128" && firstElement == "143") || (firstElement == "137" && secondElement == "54") || (firstElement == "127")*/);
     // add file requests into queue.
+
     do spawn {
         loop{
-            do add_vec.write |vec| {
-                //port.recv() will block the code and keep locking the RWArc, so we simply use peek() to check if there's message to recv.
-                //But a asynchronous solution will be much better.
-                if (port.peek()) {
-                    println("getting to port.peek");
-                    let tf:sched_msg = port.recv();
-                    println("getting after port.recv");
-                    (*vec).push(tf);
+
+            if(inCville){
+                do add_vec_cville.write |vec| {
+                    if(true){
+                        println("getting to port.peek");
+                        let tf:sched_msg = port.recv();
+                        println("getting after port.recv");
+                        (*vec).push(tf);
+                    }
                     println(fmt!("add to queue, size: %ud", (*vec).len()));
+                }
+            }
+
+            else{
+                do add_vec_other.write |vec| {
+                    //port.recv() will block the code and keep locking the RWArc, so we simply use peek() to check if there's message to recv.
+                    //But a asynchronous solution will be much better.
+                    //if (port.peek()) { //this wasnt working....
+                    
+                    if(true){
+                        println("getting to port.peek");
+                        let tf:sched_msg = port.recv();
+                        println("getting after port.recv");
+                        (*vec).push(tf);
+                    }
+                        println(fmt!("add to queue, size: %ud", (*vec).len()));
+                    
                 }
             }
         }
@@ -99,27 +126,54 @@ fn main() {
     //FIFO
     do spawn {
         loop{
-            do take_vec.write |vec| {
-                if ((*vec).len() > 0) {
-                    // FILO didn't make sense in service scheduling, so we modify it as FIFO by using shift_opt() rather than pop().
-                     let tf_opt: Option<sched_msg> = (*vec).shift_opt();
-                     let mut tf = tf_opt.unwrap();
-                    println(fmt!("shift from queue, size: %ud", (*vec).len()));
 
-                    match io::read_whole_file(tf.filepath) { // killed if file size is larger than memory size.
-                        Ok(file_data) => {
-                            println(fmt!("begin serving file [%?]", tf.filepath));
-                            // A web server should always reply a HTTP header for any legal HTTP request.
-                            tf.stream.write("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream; charset=UTF-8\r\n\r\n".as_bytes());
-                            tf.stream.write(file_data);
-                           println(fmt!("finish file [%?]", tf.filepath));
-                        }
-                        Err(err) => {
-                            println(err);
-                        }
-                    } 
+            if(inCville){
+                do take_vec_cville.write |vec| {
+                    if ((*vec).len() > 0) {
+                        // FILO didn't make sense in service scheduling, so we modify it as FIFO by using shift_opt() rather than pop().
+                         let tf_opt: Option<sched_msg> = (*vec).shift_opt();
+                         let mut tf = tf_opt.unwrap();
+                        println(fmt!("shift from queue, size: %ud", (*vec).len()));
+
+                        match io::read_whole_file(tf.filepath) { // killed if file size is larger than memory size.
+                            Ok(file_data) => {
+                                println(fmt!("begin serving file to Cville request [%?]", tf.filepath));
+                                // A web server should always reply a HTTP header for any legal HTTP request.
+                                tf.stream.write("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream; charset=UTF-8\r\n\r\n".as_bytes());
+                                tf.stream.write(file_data);
+                               println(fmt!("finish file [%?]", tf.filepath));
+                            }
+                            Err(err) => {
+                                println(err);
+                            }
+                        } 
+                    }
                 }
             }
+
+            else{
+                do take_vec_other.write |vec| {
+                    if ((*vec).len() > 0) {
+                        // FILO didn't make sense in service scheduling, so we modify it as FIFO by using shift_opt() rather than pop().
+                         let tf_opt: Option<sched_msg> = (*vec).shift_opt();
+                         let mut tf = tf_opt.unwrap();
+                        println(fmt!("shift from queue, size: %ud", (*vec).len()));
+
+                        match io::read_whole_file(tf.filepath) { // killed if file size is larger than memory size.
+                            Ok(file_data) => {
+                                println(fmt!("begin serving file to Other request [%?]", tf.filepath));
+                                // A web server should always reply a HTTP header for any legal HTTP request.
+                                tf.stream.write("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream; charset=UTF-8\r\n\r\n".as_bytes());
+                                tf.stream.write(file_data);
+                               println(fmt!("finish file [%?]", tf.filepath));
+                            }
+                            Err(err) => {
+                                println(err);
+                            }
+                        } 
+                    }
+                }
+            }    
         }
     }
     let ip = match FromStr::from_str(IP) { Some(ip) => ip, 
@@ -197,3 +251,4 @@ fn main() {
         }
     }
 }
+
