@@ -10,12 +10,12 @@
 //
 // University of Virginia - cs4414 Fall 2013
 // Weilin Xu and David Evans
-// Version 0.1
+// Version 0.2
 
 extern mod extra;
 
 use std::rt::io::*;
-use std::rt::io::net::ip::{SocketAddr, Ipv4Addr};
+use std::rt::io::net::ip::SocketAddr;
 use std::io::println;
 use std::cell::Cell;
 use std::{os, str, io};
@@ -29,9 +29,6 @@ use std::from_str::FromStr;
 
 
 static PORT:    int = 4414;
-//static IPV4_LOOPBACK: &'static str = "127.0.0.1";
-static IPV4_LOOPBACK: &'static str = "0.0.0.0";
-
 static IP: &'static str = "0.0.0.0";
 
 
@@ -75,42 +72,68 @@ fn main() {
 
     let firstIndex = user_IP.find_str(".");
     let firstElement = user_IP.slice(0, firstIndex.unwrap());
-    println(fmt!("%?", firstElement));
+    println(fmt!("IP Index 1: %?", firstElement));
     let tempIP = user_IP.slice(firstIndex.unwrap()+1, user_IP.len()-1);
-    println(fmt!("%?", tempIP));
+    //println(fmt!("%?", tempIP));
     let secondIndex = tempIP.find_str(".");
     let secondElement = tempIP.slice(0, secondIndex.unwrap());
-    println(fmt!("%?", secondElement));
+    println(fmt!("Ip Index 2 : %?", secondElement));
     // add file requests into queue.
     do spawn {
-        while(true) {
+        loop{
             do add_vec.write |vec| {
                 let tf:sched_msg = port.recv();
                 (*vec).push(tf);
                 println("add to queue");
+                
+                //Supposedly better code but is buggy so I commented it out
+
+                //port.recv() will block the code and keep locking the RWArc, so we simply use peek() to check if there's message to recv.
+                //But a asynchronous solution will be much better.
+                //if (port.peek()) {
+                    //let tf:sched_msg = port.recv();
+                    //(*vec).push(tf);
+                    //println(fmt!("add to queue, size: %ud", (*vec).len()));
+                //}
+
+                //End supposedly better code 
             }
         }
     }
     
     // take file requests from queue, and send a response.
+    //FIFO
     do spawn {
-        while(true) {
+        loop{
             do take_vec.write |vec| {
-                let mut tf = (*vec).pop();
-                
-                match io::read_whole_file(tf.filepath) {
-                    Ok(file_data) => {
-                        tf.stream.write(file_data);
-                    }
-                    Err(err) => {
-                        println(err);
-                    }
+                if ((*vec).len() > 0) {
+                    // FILO didn't make sense in service scheduling, so we modify it as FIFO by using shift_opt() rather than pop().
+                     let tf_opt: Option<sched_msg> = (*vec).shift_opt();
+                     let mut tf = tf_opt.unwrap();
+                    println(fmt!("shift from queue, size: %ud", (*vec).len()));
+
+                    match io::read_whole_file(tf.filepath) { // killed if file size is larger than memory size.
+                        Ok(file_data) => {
+                            println(fmt!("begin serving file [%?]", tf.filepath));
+                            // A web server should always reply a HTTP header for any legal HTTP request.
+                            tf.stream.write("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream; charset=UTF-8\r\n\r\n".as_bytes());
+                            tf.stream.write(file_data);
+                           println(fmt!("finish file [%?]", tf.filepath));
+                        }
+                        Err(err) => {
+                            println(err);
+                        }
+                    } 
                 }
             }
         }
     }
-    
-    let socket = net::tcp::TcpListener::bind(SocketAddr {ip: Ipv4Addr(127,0,0,1), port: PORT as u16});
+    let ip = match FromStr::from_str(IP) { Some(ip) => ip, 
+                                           None => { println(fmt!("Error: Invalid IP address <%s>", IP));
+                                                     return;},
+                                         };
+                                         
+    let socket = net::tcp::TcpListener::bind(SocketAddr {ip: ip, port: PORT as u16});
     
     println(fmt!("Listening on tcp port %d ...", PORT));
    // let mut acceptor = socket.listen().unwrap();
