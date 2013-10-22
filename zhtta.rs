@@ -82,21 +82,15 @@ fn main() {
     do spawn {
         loop{
             do add_vec.write |vec| {
-                let tf:sched_msg = port.recv();
-                (*vec).push(tf);
-                println("add to queue");
-                
-                //Supposedly better code but is buggy so I commented it out
-
                 //port.recv() will block the code and keep locking the RWArc, so we simply use peek() to check if there's message to recv.
                 //But a asynchronous solution will be much better.
-                //if (port.peek()) {
-                    //let tf:sched_msg = port.recv();
-                    //(*vec).push(tf);
-                    //println(fmt!("add to queue, size: %ud", (*vec).len()));
-                //}
-
-                //End supposedly better code 
+                if (port.peek()) {
+                    println("getting to port.peek");
+                    let tf:sched_msg = port.recv();
+                    println("getting after port.recv");
+                    (*vec).push(tf);
+                    println(fmt!("add to queue, size: %ud", (*vec).len()));
+                }
             }
         }
     }
