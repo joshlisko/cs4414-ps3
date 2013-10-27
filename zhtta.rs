@@ -26,6 +26,7 @@ use std::rt::io::*;
 use std::rt::io::net::ip::SocketAddr;
 use std::io::println;
 use std::from_str::FromStr;
+use extra::priority_queue;
 
 
 static PORT:    int = 4414;
@@ -73,15 +74,15 @@ fn main() {
     let safe_visitor_count = arc::RWArc::new(visitor_count);
     
 
-    let req_vec_other: ~[sched_msg] = ~[];
-    let shared_req_vec_other = arc::RWArc::new(req_vec_other);
-    let add_vec_other = shared_req_vec_other.clone();
-    let take_vec_other = shared_req_vec_other.clone();
+    let req_pq_other: priority_queue::PriorityQueue<sched_msg> = priority_queue::PriorityQueue::new();
+    let shared_req_pq_other = arc::RWArc::new(req_pq_other);
+    let add_pq_other = shared_req_pq_other.clone();
+    let take_pq_other = shared_req_pq_other.clone();
 
-    let req_vec_cville: ~[sched_msg] = ~[];
-    let shared_req_vec_cville = arc::RWArc::new(req_vec_cville);
-    let add_vec_cville = shared_req_vec_cville.clone();
-    let take_vec_cville = shared_req_vec_cville.clone();
+    let req_pq_cville: priority_queue::PriorityQueue<sched_msg> = priority_queue::PriorityQueue::new();
+    let shared_req_pq_cville = arc::RWArc::new(req_pq_cville);
+    let add_pq_cville= shared_req_pq_cville.clone();
+    let take_pq_cville = shared_req_pq_cville.clone();
     
     let (port, chan) = stream();
     let chan = SharedChan::new(chan);
@@ -122,30 +123,29 @@ fn main() {
         loop{
 
             if(inCville){
-                do add_vec_cville.write |vec| {
+                do add_pq_cville.write |pq| {
                     if(true){
                         println("getting to port.peek");
                         let tf:sched_msg = port.recv();
                         println("getting after port.recv");
-                        (*vec).push(tf);
+                        (*pq).push(tf);
                     }
-                    println(fmt!("add to queue, size: %ud", (*vec).len()));
+                    println(fmt!("add to queue, size: %ud", (*pq).len()));
                 }
             }
 
             else{
-                do add_vec_other.write |vec| {
+                do add_pq_other.write |pq| {
                     //port.recv() will block the code and keep locking the RWArc, so we simply use peek() to check if there's message to recv.
                     //But a asynchronous solution will be much better.
                     //if (port.peek()) { //this wasnt working....
-                    
                     if(true){
                         println("getting to port.peek");
                         let tf:sched_msg = port.recv();
                         println("getting after port.recv");
-                        (*vec).push(tf);
+                        (*pq).push(tf);
                     }
-                        println(fmt!("add to queue, size: %ud", (*vec).len()));
+                        println(fmt!("add to queue, size: %ud", (*pq).len()));
                     
                 }
             }
@@ -160,12 +160,10 @@ fn main() {
     do spawn {
         loop{
             if(inCville){
-                do take_vec_cville.write |vec| {
-                    if ((*vec).len() > 0) {
-                        // FILO didn't make sense in service scheduling, so we modify it as FIFO by using shift_opt() rather than pop().
-                        let tf_opt: Option<sched_msg> = (*vec).shift_opt();
-                        let mut tf = tf_opt.unwrap();
-                        println(fmt!("shift from queue, size: %ud", (*vec).len()));
+                do take_pq_cville.write |pq| {
+                    if ((*pq).len() > 0) {
+                        let mut tf = (*pq).pop();
+                        println(fmt!("shift from queue, size: %ud", (*pq).len()));
 			//Code to get the size of a file
 			//let filerequestpath = tf.filepath.to_str();
 			//let file_size = std::path::Path(filerequestpath).stat().unwrap().st_size as uint;
@@ -187,12 +185,10 @@ fn main() {
             }
 
             else{
-                do take_vec_other.write |vec| {
-                    if ((*vec).len() > 0) {
-                        // FILO didn't make sense in service scheduling, so we modify it as FIFO by using shift_opt() rather than pop().
-                         let tf_opt: Option<sched_msg> = (*vec).shift_opt();
-                         let mut tf = tf_opt.unwrap();
-                        println(fmt!("shift from queue, size: %ud", (*vec).len()));
+                do take_pq_other.write |pq| {
+                    if ((*pq).len() > 0) {
+                         let mut tf = (*pq).pop();
+                        println(fmt!("shift from queue, size: %ud", (*pq).len()));
 			println(fmt!("Size: %?", io::read_whole_file(tf.filepath)));
 			//println(fmt!("File size test: %?", std::path::PosixPath::get_size(tf.filepath))); 
                         match io::read_whole_file(tf.filepath) { // killed if file size is larger than memory size.
