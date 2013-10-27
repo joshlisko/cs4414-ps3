@@ -39,6 +39,7 @@ struct sched_msg {
 }
 
 fn main() {
+
     let mut visitor_count: uint = 0;
     let safe_visitor_count = arc::RWArc::new(visitor_count);
     
@@ -85,7 +86,7 @@ fn main() {
     let secondElement = tempIP.slice(0, secondIndex.unwrap());
     println(fmt!("Ip Index 2 : %?", secondElement));
 
-     let inCville = ((firstElement == "128" && firstElement == "143") || (firstElement == "137" && secondElement == "54") || (firstElement == "127")*/);
+     let inCville = ((firstElement == "128" && firstElement == "143") || (firstElement == "137" && secondElement == "54") || (firstElement == "127"));
     // add file requests into queue.
 
     do spawn {
@@ -122,19 +123,24 @@ fn main() {
         }
     }
     
+
+
+
     // take file requests from queue, and send a response.
     //FIFO
     do spawn {
         loop{
-
             if(inCville){
                 do take_vec_cville.write |vec| {
                     if ((*vec).len() > 0) {
                         // FILO didn't make sense in service scheduling, so we modify it as FIFO by using shift_opt() rather than pop().
-                         let tf_opt: Option<sched_msg> = (*vec).shift_opt();
-                         let mut tf = tf_opt.unwrap();
+                        let tf_opt: Option<sched_msg> = (*vec).shift_opt();
+                        let mut tf = tf_opt.unwrap();
                         println(fmt!("shift from queue, size: %ud", (*vec).len()));
-
+			//Code to get the size of a file
+			let filerequestpath = tf.filepath.to_str();
+			let file_size = std::path::Path(filerequestpath).stat().unwrap().st_size;
+			println(fmt!("Size: %?", file_size));
                         match io::read_whole_file(tf.filepath) { // killed if file size is larger than memory size.
                             Ok(file_data) => {
                                 println(fmt!("begin serving file to Cville request [%?]", tf.filepath));
@@ -158,7 +164,8 @@ fn main() {
                          let tf_opt: Option<sched_msg> = (*vec).shift_opt();
                          let mut tf = tf_opt.unwrap();
                         println(fmt!("shift from queue, size: %ud", (*vec).len()));
-
+			println(fmt!("Size: %?", io::read_whole_file(tf.filepath)));
+			//println(fmt!("File size test: %?", std::path::PosixPath::get_size(tf.filepath))); 
                         match io::read_whole_file(tf.filepath) { // killed if file size is larger than memory size.
                             Ok(file_data) => {
                                 println(fmt!("begin serving file to Other request [%?]", tf.filepath));
