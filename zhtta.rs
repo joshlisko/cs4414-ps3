@@ -35,7 +35,36 @@ static IP: &'static str = "0.0.0.0";
 
 struct sched_msg {
     stream: Option<std::rt::io::net::tcp::TcpStream>,
-    filepath: ~std::path::PosixPath
+    filepath: ~std::path::PosixPath,
+    filesize: uint
+}
+
+impl Ord<> for sched_msg {
+	fn lt(&self, other: &sched_msg)-> bool {
+		if(self.filesize<other.filesize){
+			return true;
+		}
+		return false;
+	}
+	fn le(&self, other: &sched_msg)-> bool {
+		if(self.filesize<=other.filesize){
+			return true;
+		}
+		return false;
+	}
+	fn gt(&self, other: &sched_msg)-> bool {
+		if(self.filesize>other.filesize){
+			return true;
+		}
+		return false;
+	}
+	fn ge(&self, other: &sched_msg)-> bool {
+		if(self.filesize>=other.filesize){
+			return true;
+		}
+		return false;
+	}
+
 }
 
 fn main() {
@@ -138,9 +167,9 @@ fn main() {
                         let mut tf = tf_opt.unwrap();
                         println(fmt!("shift from queue, size: %ud", (*vec).len()));
 			//Code to get the size of a file
-			let filerequestpath = tf.filepath.to_str();
-			let file_size = std::path::Path(filerequestpath).stat().unwrap().st_size;
-			println(fmt!("Size: %?", file_size));
+			//let filerequestpath = tf.filepath.to_str();
+			//let file_size = std::path::Path(filerequestpath).stat().unwrap().st_size as uint;
+			//println(fmt!("Size: %?", file_size));
                         match io::read_whole_file(tf.filepath) { // killed if file size is larger than memory size.
                             Ok(file_data) => {
                                 println(fmt!("begin serving file to Cville request [%?]", tf.filepath));
@@ -248,7 +277,9 @@ fn main() {
                 }
                 else {
                     // may do scheduling here
-                    let msg: sched_msg = sched_msg{stream: stream, filepath: file_path.clone()};
+                    let filerequestpath = file_path.to_str();
+					let file_size = std::path::Path(filerequestpath).stat().unwrap().st_size as uint;
+                    let msg: sched_msg = sched_msg{stream: stream, filepath: file_path.clone(), filesize: file_size};
                     child_chan.send(msg);
                     
                     println(fmt!("get file request: %?", file_path));
