@@ -42,25 +42,25 @@ struct sched_msg {
 
 impl Ord<> for sched_msg {
     fn lt(&self, other: &sched_msg)-> bool {
-        if(self.filesize<other.filesize){
-            return true;
-        }
-        return false;
-    }
-    fn le(&self, other: &sched_msg)-> bool {
-        if(self.filesize<=other.filesize){
-            return true;
-        }
-        return false;
-    }
-    fn gt(&self, other: &sched_msg)-> bool {
         if(self.filesize>other.filesize){
             return true;
         }
         return false;
     }
-    fn ge(&self, other: &sched_msg)-> bool {
+    fn le(&self, other: &sched_msg)-> bool {
         if(self.filesize>=other.filesize){
+            return true;
+        }
+        return false;
+    }
+    fn gt(&self, other: &sched_msg)-> bool {
+        if(self.filesize<other.filesize){
+            return true;
+        }
+        return false;
+    }
+    fn ge(&self, other: &sched_msg)-> bool {
+        if(self.filesize<=other.filesize){
             return true;
         }
         return false;
@@ -74,13 +74,13 @@ fn main() {
     let safe_visitor_count = arc::RWArc::new(visitor_count);
     
 
-    let req_pq_other: priority_queue::PriorityQueue<sched_msg> = priority_queue::PriorityQueue::new();
-    let shared_req_pq_other = arc::RWArc::new(req_pq_other);
+    let mut req_pq_other: priority_queue::PriorityQueue<sched_msg> = priority_queue::PriorityQueue::new();
+    let mut shared_req_pq_other = arc::RWArc::new(req_pq_other);
     let add_pq_other = shared_req_pq_other.clone();
     let take_pq_other = shared_req_pq_other.clone();
 
-    let req_pq_cville: priority_queue::PriorityQueue<sched_msg> = priority_queue::PriorityQueue::new();
-    let shared_req_pq_cville = arc::RWArc::new(req_pq_cville);
+    let mut req_pq_cville: priority_queue::PriorityQueue<sched_msg> = priority_queue::PriorityQueue::new();
+    let mut shared_req_pq_cville = arc::RWArc::new(req_pq_cville);
     let add_pq_cville= shared_req_pq_cville.clone();
     let take_pq_cville = shared_req_pq_cville.clone();
     
@@ -121,7 +121,6 @@ fn main() {
 
     do spawn {
         loop{
-
             if(inCville){
                 do add_pq_cville.write |pq| {
                     if(true){
@@ -157,6 +156,9 @@ fn main() {
         loop{
             if(inCville){
                 do take_pq_cville.write |pq| {
+                    if ((*pq).len() > 2){
+                        println("QUEUE ACTUALLY WORKS");
+                    }
                     if ((*pq).len() > 0) {
                         let mut tf = (*pq).pop();
                         //println(fmt!("shift from queue, size: %ud", (*pq).len()));
@@ -184,7 +186,7 @@ fn main() {
                 do take_pq_other.write |pq| {
                     if ((*pq).len() > 0) {
                          let mut tf = (*pq).pop();
-                        println(fmt!("shift from queue, size: %ud", (*pq).len()));
+                        //println(fmt!("shift from queue, size: %ud", (*pq).len()));
             println(fmt!("Size: %?", io::read_whole_file(tf.filepath)));
             //println(fmt!("File size test: %?", std::path::PosixPath::get_size(tf.filepath))); 
                         match io::read_whole_file(tf.filepath) { // killed if file size is larger than memory size.
@@ -241,11 +243,11 @@ fn main() {
             let req_group : ~[&str]= request_str.splitn_iter(' ', 3).collect();
             if req_group.len() > 2 {
                 let path = req_group[1];
-                println(fmt!("Request for path: \n%?", path));
+               // println(fmt!("Request for path: \n%?", path));
                 
                 let file_path = ~os::getcwd().push(path.replace("/../", ""));
                 if !os::path_exists(file_path) || os::path_is_dir(file_path) {
-                    println(fmt!("Request received:\n%s", request_str));
+                   // println(fmt!("Request received:\n%s", request_str));
 
                     //store the current count to a copy value
                     let mut visitor_count_copy: uint = 0;
@@ -274,10 +276,10 @@ fn main() {
                     let msg: sched_msg = sched_msg{stream: stream, filepath: file_path.clone(), filesize: file_size};
                     child_chan.send(msg);
                     
-                    println(fmt!("get file request: %?", file_path.filename().unwrap()));
+                   // println(fmt!("get file request: %?", file_path.filename().unwrap()));
                 }
             }
-            println!("connection terminates")
+            //println!("connection terminates")
         }
     }
 }
