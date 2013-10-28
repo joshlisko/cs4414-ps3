@@ -41,30 +41,30 @@ struct sched_msg {
 }
 
 impl Ord<> for sched_msg {
-	fn lt(&self, other: &sched_msg)-> bool {
-		if(self.filesize<other.filesize){
-			return true;
-		}
-		return false;
-	}
-	fn le(&self, other: &sched_msg)-> bool {
-		if(self.filesize<=other.filesize){
-			return true;
-		}
-		return false;
-	}
-	fn gt(&self, other: &sched_msg)-> bool {
-		if(self.filesize>other.filesize){
-			return true;
-		}
-		return false;
-	}
-	fn ge(&self, other: &sched_msg)-> bool {
-		if(self.filesize>=other.filesize){
-			return true;
-		}
-		return false;
-	}
+    fn lt(&self, other: &sched_msg)-> bool {
+        if(self.filesize<other.filesize){
+            return true;
+        }
+        return false;
+    }
+    fn le(&self, other: &sched_msg)-> bool {
+        if(self.filesize<=other.filesize){
+            return true;
+        }
+        return false;
+    }
+    fn gt(&self, other: &sched_msg)-> bool {
+        if(self.filesize>other.filesize){
+            return true;
+        }
+        return false;
+    }
+    fn ge(&self, other: &sched_msg)-> bool {
+        if(self.filesize>=other.filesize){
+            return true;
+        }
+        return false;
+    }
 
 }
 
@@ -116,7 +116,7 @@ fn main() {
     let secondElement = tempIP.slice(0, secondIndex.unwrap());
     println(fmt!("Ip Index 2 : %?", secondElement));
 
-     let inCville = ((firstElement == "128" && firstElement == "143") || (firstElement == "137" && secondElement == "54") || (firstElement == "127"));
+     let inCville = ((firstElement == "128" && firstElement == "143") || (firstElement == "137" && secondElement == "54") || (firstElement == "127") || (firstElement == "192"));
     // add file requests into queue.
 
     do spawn {
@@ -125,12 +125,11 @@ fn main() {
             if(inCville){
                 do add_pq_cville.write |pq| {
                     if(true){
-                        println("getting to port.peek");
                         let tf:sched_msg = port.recv();
-                        println("getting after port.recv");
+                        println(fmt!("add to Cville queue: %?", tf.filepath.filename().unwrap()));
                         (*pq).push(tf);
                     }
-                    println(fmt!("add to queue, size: %ud", (*pq).len()));
+                   
                 }
             }
 
@@ -140,13 +139,10 @@ fn main() {
                     //But a asynchronous solution will be much better.
                     //if (port.peek()) { //this wasnt working....
                     if(true){
-                        println("getting to port.peek");
                         let tf:sched_msg = port.recv();
-                        println("getting after port.recv");
+                        println(fmt!("add to Other queue: %?", tf.filepath.filename().unwrap()));
                         (*pq).push(tf);
-                    }
-                        println(fmt!("add to queue, size: %ud", (*pq).len()));
-                    
+                    }                   
                 }
             }
         }
@@ -163,18 +159,18 @@ fn main() {
                 do take_pq_cville.write |pq| {
                     if ((*pq).len() > 0) {
                         let mut tf = (*pq).pop();
-                        println(fmt!("shift from queue, size: %ud", (*pq).len()));
-			//Code to get the size of a file
-			//let filerequestpath = tf.filepath.to_str();
-			//let file_size = std::path::Path(filerequestpath).stat().unwrap().st_size as uint;
-			//println(fmt!("Size: %?", file_size));
+                        //println(fmt!("shift from queue, size: %ud", (*pq).len()));
+            //Code to get the size of a file
+            //let filerequestpath = tf.filepath.to_str();
+            //let file_size = std::path::Path(filerequestpath).stat().unwrap().st_size as uint;
+            //println(fmt!("Size: %?", file_size));
                         match io::read_whole_file(tf.filepath) { // killed if file size is larger than memory size.
                             Ok(file_data) => {
-                                println(fmt!("begin serving file to Cville request [%?]", tf.filepath));
+                                println(fmt!("begin serving file to Cville request: %?", tf.filepath.filename().unwrap()));
                                 // A web server should always reply a HTTP header for any legal HTTP request.
                                 tf.stream.write("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream; charset=UTF-8\r\n\r\n".as_bytes());
                                 tf.stream.write(file_data);
-                               println(fmt!("finish file [%?]", tf.filepath));
+                               //println(fmt!("finish file [%?]", tf.filepath));
                             }
                             Err(err) => {
                                 println(err);
@@ -189,15 +185,15 @@ fn main() {
                     if ((*pq).len() > 0) {
                          let mut tf = (*pq).pop();
                         println(fmt!("shift from queue, size: %ud", (*pq).len()));
-			println(fmt!("Size: %?", io::read_whole_file(tf.filepath)));
-			//println(fmt!("File size test: %?", std::path::PosixPath::get_size(tf.filepath))); 
+            println(fmt!("Size: %?", io::read_whole_file(tf.filepath)));
+            //println(fmt!("File size test: %?", std::path::PosixPath::get_size(tf.filepath))); 
                         match io::read_whole_file(tf.filepath) { // killed if file size is larger than memory size.
                             Ok(file_data) => {
-                                println(fmt!("begin serving file to Other request [%?]", tf.filepath));
+                                println(fmt!("begin serving file to Other request: %?", tf.filepath.filename().unwrap()));
                                 // A web server should always reply a HTTP header for any legal HTTP request.
                                 tf.stream.write("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream; charset=UTF-8\r\n\r\n".as_bytes());
                                 tf.stream.write(file_data);
-                               println(fmt!("finish file [%?]", tf.filepath));
+                               //println(fmt!("finish file [%?]", tf.filepath));
                             }
                             Err(err) => {
                                 println(err);
@@ -274,15 +270,14 @@ fn main() {
                 else {
                     // may do scheduling here
                     let filerequestpath = file_path.to_str();
-					let file_size = std::path::Path(filerequestpath).stat().unwrap().st_size as uint;
+                    let file_size = std::path::Path(filerequestpath).stat().unwrap().st_size as uint;
                     let msg: sched_msg = sched_msg{stream: stream, filepath: file_path.clone(), filesize: file_size};
                     child_chan.send(msg);
                     
-                    println(fmt!("get file request: %?", file_path));
+                    println(fmt!("get file request: %?", file_path.filename().unwrap()));
                 }
             }
             println!("connection terminates")
         }
     }
 }
-
