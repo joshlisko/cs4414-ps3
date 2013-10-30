@@ -64,6 +64,17 @@ impl Ord<> for sched_msg {
 
 
 fn main() {
+
+    let mut commandArgs = std::os::args();
+    let gash_flag = (commandArgs.len()>1 && (commandArgs[1] == ~"--gash=true"));
+
+
+    //let testPath = ~std::path::PosixPath{is_absolute: true, components: ~[~"home", ~"student", ~"cs4414-ps3", ~"test2.html"]};
+    //let p = testPath.filetype();
+    //println(fmt!("%?", p.unwrap()));
+    //editHTML(testPath, gash_flag);
+
+
     let mut visitor_count: uint =0;
     let safe_visitor_count = arc::RWArc::new(visitor_count);
 
@@ -146,9 +157,23 @@ fn main() {
                     Ok(file_data) => {
                         //println(fmt!("begin serving file: %?", tf.filepath.filename().unwrap()));
                         // A web server should always reply a HTTP header for any legal HTTP request.
-                        tf.stream.write("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream; charset=UTF-8\r\n\r\n".as_bytes());
-                        tf.stream.write(file_data);
-                        //println(fmt!("finish file [%?]", tf.filepath));
+
+                        if(tf.filepath.filetype().unwrap() == ".html" || tf.filepath.filetype().unwrap() == ".shtml"){
+                            if(tf.filepath.filetype().unwrap() == ".shtml" && gash_flag){
+                                tf.stream.write("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n".as_bytes());
+                                let editedFile = editHTML(tf.filepath.to_str());
+                                tf.stream.write(editedFile.as_bytes());
+                            }
+                            else{
+                                tf.stream.write("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n".as_bytes());
+                                tf.stream.write(file_data);
+                            }
+                        }
+                        else{
+                            tf.stream.write("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream; charset=UTF-8\r\n\r\n".as_bytes());
+                            tf.stream.write(file_data);
+                            //println(fmt!("finish file [%?]", tf.filepath));
+                        }
                     }
                     Err(err) => {
                         println(err);
@@ -169,13 +194,28 @@ fn main() {
                     }
                 }
                 let mut tf: sched_msg = sm_port.recv(); // wait for the dequeued request to handle
+                
                 match io::read_whole_file(tf.filepath) { // killed if file size is larger than memory size.
                     Ok(file_data) => {
                         //println(fmt!("begin serving file: %?", tf.filepath.filename().unwrap()));
                         // A web server should always reply a HTTP header for any legal HTTP request.
-                        tf.stream.write("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream; charset=UTF-8\r\n\r\n".as_bytes());
-                        tf.stream.write(file_data);
-                        //println(fmt!("finish file [%?]", tf.filepath));
+
+                        if(tf.filepath.filetype().unwrap() == ".html" || tf.filepath.filetype().unwrap() == ".shtml"){
+                            if(tf.filepath.filetype().unwrap() == ".shtml" && gash_flag){
+                                tf.stream.write("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n".as_bytes());
+                                let editedFile = editHTML(tf.filepath.to_str());
+                                tf.stream.write(editedFile.as_bytes());
+                            }
+                            else{
+                                tf.stream.write("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n".as_bytes());
+                                tf.stream.write(file_data);
+                            }
+                        }
+                        else{
+                            tf.stream.write("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream; charset=UTF-8\r\n\r\n".as_bytes());
+                            tf.stream.write(file_data);
+                            //println(fmt!("finish file [%?]", tf.filepath));
+                        }
                     }
                     Err(err) => {
                         println(err);
@@ -187,10 +227,6 @@ fn main() {
 
         }
     }
-
-    
-
-
 
     //start listening
     let mut acceptor = acceptor1.unwrap();
@@ -221,28 +257,37 @@ fn main() {
                 //println(fmt!("Request for path: \n%?", path));
                 
                 let file_path = ~os::getcwd().push(path.replace("/../", ""));
+                
                 if !os::path_exists(file_path) || os::path_is_dir(file_path) {
                     //println(fmt!("Request received:\n%s", request_str));
-
+                   
                     let mut visitor_count_copy: uint = 0;
                     do safe_visitor_count_local.read |visitor_count| {
                         visitor_count_copy = *visitor_count;
-                    }    
+                    }
+
+                    //not the homepage
+                    
+                    
+
+                    //homepage
+                    
+                        let response: ~str = fmt!(
+                            "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n
+                             <doctype !html><html><head><title>Hello, Rust!</title>
+                             <style>body { background-color: #111; color: #FFEEAA }
+                                    h1 { font-size:2cm; text-align: center; color: black; text-shadow: 0 0 4mm red}
+                                    h2 { font-size:2cm; text-align: center; color: black; text-shadow: 0 0 4mm green}
+                             </style></head>
+                             <body>
+                             <h1>Greetings, Krusty!</h1>
+                             <h2>Visitor count: %u</h2>
+                             </body></html>\r\n", visitor_count_copy);
+                        //write file
+                        stream.write(response.as_bytes());
+                    
 
 
-                    let response: ~str = fmt!(
-                        "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n
-                         <doctype !html><html><head><title>Hello, Rust!</title>
-                         <style>body { background-color: #111; color: #FFEEAA }
-                                h1 { font-size:2cm; text-align: center; color: black; text-shadow: 0 0 4mm red}
-                                h2 { font-size:2cm; text-align: center; color: black; text-shadow: 0 0 4mm green}
-                         </style></head>
-                         <body>
-                         <h1>Greetings, Krusty!</h1>
-                         <h2>Visitor count: %u</h2>
-                         </body></html>\r\n", visitor_count_copy);
-
-                    stream.write(response.as_bytes());
                 }
                 else {
                     // Requests scheduling
@@ -278,3 +323,47 @@ fn main() {
         }
     }
 }
+
+
+fn editHTML(fpath: &str) -> ~str {
+    let f_path = std::path::PosixPath(fpath);
+    let mut file_string = ~"";
+    match io::read_whole_file_str(&f_path) {
+        Ok(file_data) => {file_string.push_str(file_data);}
+        Err(err) => {println(err);}
+    }
+
+    println(file_string);
+
+    let firstCarrot = file_string.find_str("<!--#exec cmd=");
+    let firstSlice = file_string.slice(firstCarrot.unwrap(), file_string.len()-1);
+    println(fmt!("%?",firstSlice));
+    let tempCom = file_string.slice(firstCarrot.unwrap()+14, file_string.len()-1);
+    let secondCarrot = tempCom.find_str("-->");
+    let secondSlice = tempCom.slice(1, secondCarrot.unwrap()-1);
+    println(fmt!("%s", secondSlice));
+
+    let commandString = file_string.slice(firstCarrot.unwrap(), file_string.find_str("-->").unwrap()+3);
+    println(commandString);
+
+    let mut argumentString = secondSlice.to_str();
+
+    println(argumentString);
+    let testString = "ls";
+    let mut argv: ~[~str] = ~[];
+    argv.push(argumentString);
+    println(fmt!("%?", argv));
+
+
+    let output = std::run::process_output("./gash0_8", argv).output;
+    println(fmt!("Process output: %?", str::from_utf8(output)));
+
+    let newFileText = std::str::replace(file_string, commandString, str::from_utf8(output));
+    return newFileText;
+
+    //let mut writer = std::rt::io::file::open(~f_path, Create, ReadWrite);
+    //writer.write(newFileText.as_bytes());
+    
+}
+
+
